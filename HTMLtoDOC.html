@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <link href="https://fonts.cdnfonts.com/css/inter" rel="stylesheet">
     <link href="https://fonts.cdnfonts.com/css/jetbrains-mono" rel="stylesheet">
     <style>
@@ -64,7 +65,7 @@
     <div class="glass-panel rounded-3xl p-8 w-full max-w-4xl fade-in">
         <div class="text-center mb-8">
             <h1 class="text-4xl font-bold text-gray-800 mb-2">HTML Converter Pro</h1>
-            <p class="text-gray-600">Преобразуйте HTML код в DOCX, XML и PPTX файлы</p>
+            <p class="text-gray-600">Преобразуйте HTML код в DOCX, XLSX и PPTX файлы</p>
         </div>
 
         <div class="grid lg:grid-cols-2 gap-8">
@@ -111,25 +112,25 @@
                             <div class="text-blue-600 mb-2">
                                 <svg class="w-8 h-8 mx-auto" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
-                                    <text x="7" y="18" font-size="5" fill="#fff" font-weight="bold">DOCX</text>
+                                    <text x="12" y="18" font-size="5" fill="#fff" font-weight="bold" text-anchor="middle">DOCX</text>
                                 </svg>
                             </div>
                             <span class="text-sm font-medium text-gray-700">DOCX</span>
                         </div>
-                        <div class="format-card border-2 border-gray-200 rounded-xl p-4 text-center" data-format="xml">
+                        <div class="format-card border-2 border-gray-200 rounded-xl p-4 text-center" data-format="xlsx">
                             <div class="text-green-600 mb-2">
                                 <svg class="w-8 h-8 mx-auto" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
-                                    <text x="8" y="18" font-size="5" fill="#fff" font-weight="bold">XML</text>
+                                    <text x="12" y="18" font-size="5" fill="#fff" font-weight="bold" text-anchor="middle">XLSX</text>
                                 </svg>
                             </div>
-                            <span class="text-sm font-medium text-gray-700">XML</span>
+                            <span class="text-sm font-medium text-gray-700">XLSX</span>
                         </div>
                         <div class="format-card border-2 border-gray-200 rounded-xl p-4 text-center" data-format="pptx">
                             <div class="text-orange-600 mb-2">
                                 <svg class="w-8 h-8 mx-auto" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
-                                    <text x="7" y="18" font-size="5" fill="#fff" font-weight="bold">PPTX</text>
+                                    <text x="12" y="18" font-size="5" fill="#fff" font-weight="bold" text-anchor="middle">PPTX</text>
                                 </svg>
                             </div>
                             <span class="text-sm font-medium text-gray-700">PPTX</span>
@@ -277,9 +278,9 @@
                 if (selectedFormat === 'docx') {
                     blob = await generateDOCX(htmlContent);
                     extension = '.docx';
-                } else if (selectedFormat === 'xml') {
-                    blob = generateXML(htmlContent);
-                    extension = '.xml';
+                } else if (selectedFormat === 'xlsx') {
+                    blob = generateXLSX(htmlContent);
+                    extension = '.xlsx';
                 } else if (selectedFormat === 'pptx') {
                     blob = await generatePPTX(htmlContent);
                     extension = '.pptx';
@@ -578,52 +579,67 @@
             return blob;
         }
 
-        // ============ XML (сохраняет структуру HTML как XML) ============
-        function generateXML(html) {
+        // ============ XLSX (Excel таблица из HTML) ============
+        function generateXLSX(html) {
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
             
-            function escapeXml(str) {
-                if (!str) return '';
-                return String(str)
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .replace(/"/g, '&quot;')
-                    .replace(/'/g, '&apos;');
-            }
-
-            function nodeToXml(node, indent = '  ') {
-                let xml = '';
-                for (const child of node.childNodes) {
-                    if (child.nodeType === Node.TEXT_NODE) {
-                        const text = child.textContent.trim();
-                        if (text) xml += indent + escapeXml(text) + '\n';
-                    } else if (child.nodeType === Node.ELEMENT_NODE) {
-                        const tag = child.tagName.toLowerCase();
-                        const attrs = Array.from(child.attributes).map(a => ` ${a.name}="${escapeXml(a.value)}"`).join('');
-                        const inner = nodeToXml(child, indent + '  ');
-                        if (inner.trim()) {
-                            xml += `${indent}<${tag}${attrs}>\n${inner}${indent}</${tag}>\n`;
-                        } else {
-                            xml += `${indent}<${tag}${attrs}/>\n`;
-                        }
-                    }
+            // Создаем новую книгу Excel
+            const wb = XLSX.utils.book_new();
+            
+            // Собираем данные из HTML в массив строк
+            const rows = [];
+            
+            // Функция для рекурсивного обхода элементов
+            function extractText(node) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    return node.textContent.trim();
                 }
-                return xml;
+                let text = '';
+                for (const child of node.childNodes) {
+                    text += extractText(child);
+                }
+                return text;
             }
-
-            const bodyContent = nodeToXml(doc.body);
-            const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
-<document>
-  <head>
-    <title>Converted HTML Document</title>
-    <charset>UTF-8</charset>
-  </head>
-  <body>
-${bodyContent}  </body>
-</document>`;
-            return new Blob([xmlContent], { type: 'application/xml; charset=utf-8' });
+            
+            // Обрабатываем заголовки и параграфы
+            const elements = doc.body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li, td, th');
+            
+            if (elements.length === 0) {
+                // Если нет структурированных элементов, берем весь текст
+                const bodyText = extractText(doc.body);
+                if (bodyText) {
+                    rows.push([bodyText]);
+                }
+            } else {
+                elements.forEach(el => {
+                    const tag = el.tagName.toLowerCase();
+                    const text = extractText(el);
+                    if (text) {
+                        // Определяем уровень заголовка для отступа
+                        let prefix = '';
+                        if (tag.startsWith('h')) {
+                            const level = parseInt(tag[1]);
+                            prefix = '#'.repeat(level) + ' ';
+                        } else if (tag === 'li') {
+                            prefix = '- ';
+                        }
+                        rows.push([prefix + text]);
+                    }
+                });
+            }
+            
+            // Добавляем данные в лист
+            const ws = XLSX.utils.aoa_to_sheet(rows);
+            
+            // Устанавливаем ширину колонки
+            ws['!cols'] = [{ wch: 50 }];
+            
+            // Добавляем лист в книгу
+            XLSX.utils.book_append_sheet(wb, ws, 'HTML Content');
+            
+            // Генерируем файл
+            return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
         }
 
         // ============ PPTX (настоящий формат PowerPoint) ============
@@ -764,7 +780,7 @@ ${bodyContent}  </body>
 <h2>Возможности:</h2>
 <ul>
     <li>Конвертация в DOCX (Word)</li>
-    <li>Конвертация в XML</li>
+    <li>Конвертация в XLSX (Excel)</li>
     <li>Конвертация в PPTX (PowerPoint)</li>
 </ul>
 <blockquote>Попробуйте вставить свой HTML код или загрузить файл!</blockquote>`;
