@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML Converter Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+    <link href="https://fonts.cdnfonts.com/css/inter" rel="stylesheet">
+    <link href="https://fonts.cdnfonts.com/css/jetbrains-mono" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        .code-editor {
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1.6;
+            tab-size: 4;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+        .format-card { transition: all 0.3s ease; cursor: pointer; }
+        .format-card:hover { transform: translateY(-4px); box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1); }
+        .format-card.selected {
+            border-color: #667eea;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        }
+        .file-upload-zone { border: 2px dashed #cbd5e1; transition: all 0.3s ease; }
+        .file-upload-zone:hover, .file-upload-zone.dragover {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.05);
+        }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .success-checkmark { animation: checkmark 0.6s ease-in-out; }
+        @keyframes checkmark { 0% { transform: scale(0); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+        .spinner {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            width: 20px; height: 20px;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4">
+    <div class="glass-panel rounded-3xl p-8 w-full max-w-4xl fade-in">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">HTML Converter Pro</h1>
+            <p class="text-gray-600">Преобразуйте HTML код в DOCX, XML и PPTX файлы</p>
+        </div>
+
+        <div class="grid lg:grid-cols-2 gap-8">
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-3">HTML Код</label>
+                    <textarea 
+                        id="htmlInput" 
+                        class="w-full h-64 code-editor bg-gray-50 border border-gray-300 rounded-xl p-4 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all resize-none"
+                        placeholder="<h1>Введите ваш HTML код здесь...</h1>"
+                    ></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-3">Загрузить HTML файл</label>
+                    <div id="dropZone" class="file-upload-zone rounded-xl p-6 text-center cursor-pointer">
+                        <div class="text-gray-400 mb-2">
+                            <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                        </div>
+                        <p class="text-gray-600 text-sm mb-1">Перетащите файл сюда или нажмите для выбора</p>
+                        <p class="text-gray-400 text-xs">Поддерживаются .html, .htm файлы</p>
+                        <input type="file" id="fileInput" accept=".html,.htm" class="hidden">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-3">Имя файла (опционально)</label>
+                    <input 
+                        type="text" 
+                        id="filenameInput" 
+                        class="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
+                        placeholder="document (по умолчанию: html-converter-output)"
+                    >
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-4">Выберите формат</label>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="format-card selected border-2 border-gray-200 rounded-xl p-4 text-center" data-format="docx">
+                            <div class="text-blue-600 mb-2">
+                                <svg class="w-8 h-8 mx-auto" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+                                    <text x="7" y="18" font-size="5" fill="#fff" font-weight="bold">DOCX</text>
+                                </svg>
+                            </div>
+                            <span class="text-sm font-medium text-gray-700">DOCX</span>
+                        </div>
+                        <div class="format-card border-2 border-gray-200 rounded-xl p-4 text-center" data-format="xml">
+                            <div class="text-green-600 mb-2">
+                                <svg class="w-8 h-8 mx-auto" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+                                    <text x="8" y="18" font-size="5" fill="#fff" font-weight="bold">XML</text>
+                                </svg>
+                            </div>
+                            <span class="text-sm font-medium text-gray-700">XML</span>
+                        </div>
+                        <div class="format-card border-2 border-gray-200 rounded-xl p-4 text-center" data-format="pptx">
+                            <div class="text-orange-600 mb-2">
+                                <svg class="w-8 h-8 mx-auto" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+                                    <text x="7" y="18" font-size="5" fill="#fff" font-weight="bold">PPTX</text>
+                                </svg>
+                            </div>
+                            <span class="text-sm font-medium text-gray-700">PPTX</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="convertBtn" class="btn-primary w-full py-4 px-6 rounded-xl text-white font-semibold text-lg flex items-center justify-center space-x-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    </svg>
+                    <span>Создать файл</span>
+                </button>
+
+                <div id="progressSection" class="hidden text-center py-4">
+                    <div class="inline-flex items-center space-x-3">
+                        <div class="spinner"></div>
+                        <p class="text-sm text-gray-600">Конвертация...</p>
+                    </div>
+                </div>
+
+                <div id="successMessage" class="hidden text-center py-4">
+                    <div class="success-checkmark inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-3">
+                        <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-1">Файл создан успешно!</h3>
+                    <p id="successText" class="text-sm text-gray-600">Файл сохранен в папку загрузки</p>
+                </div>
+
+                <div id="errorMessage" class="hidden text-center py-4">
+                    <div class="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-3">
+                        <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-1">Ошибка конвертации</h3>
+                    <p id="errorText" class="text-sm text-gray-600">Произошла ошибка</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-gray-200">
+            <div class="grid md:grid-cols-3 gap-4 text-center">
+                <div class="flex items-center justify-center space-x-2 text-gray-600">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span class="text-sm">UTF-8 кодировка</span>
+                </div>
+                <div class="flex items-center justify-center space-x-2 text-gray-600">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    <span class="text-sm">Настоящие форматы Office</span>
+                </div>
+                <div class="flex items-center justify-center space-x-2 text-gray-600">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                    <span class="text-sm">Безопасная обработка</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFormat = 'docx';
+
+        const htmlInput = document.getElementById('htmlInput');
+        const fileInput = document.getElementById('fileInput');
+        const dropZone = document.getElementById('dropZone');
+        const filenameInput = document.getElementById('filenameInput');
+        const convertBtn = document.getElementById('convertBtn');
+        const progressSection = document.getElementById('progressSection');
+        const successMessage = document.getElementById('successMessage');
+        const successText = document.getElementById('successText');
+        const errorMessage = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+        const formatCards = document.querySelectorAll('.format-card');
+
+        formatCards.forEach(card => {
+            card.addEventListener('click', () => {
+                formatCards.forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                selectedFormat = card.dataset.format;
+            });
+        });
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) handleFileUpload(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) handleFileUpload(e.target.files[0]);
+        });
+
+        function handleFileUpload(file) {
+            if (!file.name.match(/\.(html|htm)$/i)) {
+                showError('Пожалуйста, выберите HTML файл (.html или .htm)');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                htmlInput.value = e.target.result;
+                filenameInput.value = file.name.replace(/\.[^/.]+$/, "");
+                showSuccess('Файл успешно загружен!');
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        convertBtn.addEventListener('click', async () => {
+            const htmlContent = htmlInput.value.trim();
+            if (!htmlContent) {
+                showError('Пожалуйста, введите HTML код или загрузите файл');
+                return;
+            }
+            const filename = filenameInput.value.trim() || 'html-converter-output';
+            hideMessages();
+            progressSection.classList.remove('hidden');
+            convertBtn.disabled = true;
+
+            try {
+                let blob, extension;
+                if (selectedFormat === 'docx') {
+                    blob = await generateDOCX(htmlContent);
+                    extension = '.docx';
+                } else if (selectedFormat === 'xml') {
+                    blob = generateXML(htmlContent);
+                    extension = '.xml';
+                } else if (selectedFormat === 'pptx') {
+                    blob = await generatePPTX(htmlContent);
+                    extension = '.pptx';
+                }
+
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename + extension;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                progressSection.classList.add('hidden');
+                showSuccess(`Файл ${filename}${extension} успешно создан!`);
+            } catch (error) {
+                progressSection.classList.add('hidden');
+                showError('Ошибка: ' + error.message);
+                console.error(error);
+            } finally {
+                convertBtn.disabled = false;
+            }
+        });
+
+        // ============ ПАРСИНГ HTML В СТРУКТУРУ ============
+        function parseHTMLToBlocks(html) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const blocks = [];
+            const body = doc.body;
+
+            function walk(node) {
+                for (const child of node.childNodes) {
+                    if (child.nodeType === Node.TEXT_NODE) {
+                        const text = child.textContent.trim();
+                        if (text) blocks.push({ type: 'paragraph', text });
+                    } else if (child.nodeType === Node.ELEMENT_NODE) {
+                        const tag = child.tagName.toLowerCase();
+                        const text = child.textContent.trim();
+                        if (!text && !['br','hr','img'].includes(tag)) continue;
+
+                        if (/^h[1-6]$/.test(tag)) {
+                            blocks.push({ type: 'heading', level: parseInt(tag[1]), text });
+                        } else if (tag === 'p') {
+                            blocks.push({ type: 'paragraph', text });
+                        } else if (tag === 'br') {
+                            blocks.push({ type: 'break' });
+                        } else if (tag === 'hr') {
+                            blocks.push({ type: 'hr' });
+                        } else if (tag === 'ul' || tag === 'ol') {
+                            const items = Array.from(child.querySelectorAll(':scope > li')).map(li => li.textContent.trim());
+                            blocks.push({ type: 'list', ordered: tag === 'ol', items });
+                        } else if (tag === 'li') {
+                            blocks.push({ type: 'listitem', text });
+                        } else if (tag === 'blockquote') {
+                            blocks.push({ type: 'quote', text });
+                        } else if (tag === 'pre' || tag === 'code') {
+                            blocks.push({ type: 'code', text });
+                        } else if (tag === 'table') {
+                            const rows = Array.from(child.querySelectorAll('tr')).map(tr =>
+                                Array.from(tr.querySelectorAll('td,th')).map(c => c.textContent.trim())
+                            );
+                            blocks.push({ type: 'table', rows });
+                        } else {
+                            // Рекурсивно обрабатываем div, section, article и т.д.
+                            walk(child);
+                        }
+                    }
+                }
+            }
+            walk(body);
+            return blocks;
+        }
+
+        // ============ DOCX (настоящий формат Office) ============
+        async function generateDOCX(html) {
+            const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, Table, TableRow, TableCell, WidthType } = docx;
+            const blocks = parseHTMLToBlocks(html);
+            const children = [];
+
+            for (const block of blocks) {
+                if (block.type === 'heading') {
+                    const levels = {
+                        1: HeadingLevel.HEADING_1,
+                        2: HeadingLevel.HEADING_2,
+                        3: HeadingLevel.HEADING_3,
+                        4: HeadingLevel.HEADING_4,
+                        5: HeadingLevel.HEADING_5,
+                        6: HeadingLevel.HEADING_6
+                    };
+                    children.push(new Paragraph({
+                        text: block.text,
+                        heading: levels[block.level] || HeadingLevel.HEADING_1
+                    }));
+                } else if (block.type === 'paragraph') {
+                    children.push(new Paragraph({
+                        children: [new TextRun({ text: block.text, size: 24 })]
+                    }));
+                } else if (block.type === 'listitem') {
+                    children.push(new Paragraph({
+                        children: [new TextRun({ text: '• ' + block.text, size: 24 })],
+                        indent: { left: 720 }
+                    }));
+                } else if (block.type === 'list') {
+                    block.items.forEach((item, i) => {
+                        const prefix = block.ordered ? `${i + 1}. ` : '• ';
+                        children.push(new Paragraph({
+                            children: [new TextRun({ text: prefix + item, size: 24 })],
+                            indent: { left: 720 }
+                        }));
+                    });
+                } else if (block.type === 'quote') {
+                    children.push(new Paragraph({
+                        children: [new TextRun({ text: block.text, italics: true, size: 24, color: '555555' })],
+                        indent: { left: 720 }
+                    }));
+                } else if (block.type === 'code') {
+                    children.push(new Paragraph({
+                        children: [new TextRun({ text: block.text, font: 'Courier New', size: 20 })],
+                        shading: { fill: 'F0F0F0' }
+                    }));
+                } else if (block.type === 'hr') {
+                    children.push(new Paragraph({
+                        border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '999999' } }
+                    }));
+                } else if (block.type === 'table') {
+                    const tableRows = block.rows.map(row =>
+                        new TableRow({
+                            children: row.map(cell =>
+                                new TableCell({
+                                    children: [new Paragraph({ children: [new TextRun({ text: cell, size: 22 })] })],
+                                    width: { size: 100 / row.length, type: WidthType.PERCENTAGE }
+                                })
+                            )
+                        })
+                    );
+                    if (tableRows.length > 0) {
+                        children.push(new Table({ rows: tableRows, width: { size: 100, type: WidthType.PERCENTAGE } }));
+                    }
+                } else if (block.type === 'break') {
+                    children.push(new Paragraph({ text: '' }));
+                }
+            }
+
+            if (children.length === 0) {
+                children.push(new Paragraph({ text: 'Пустой документ' }));
+            }
+
+            const doc = new Document({
+                sections: [{ children }]
+            });
+
+            const blob = await Packer.toBlob(doc);
+            return blob;
+        }
+
+        // ============ XML (сохраняет структуру HTML как XML) ============
+        function generateXML(html) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            function escapeXml(str) {
+                return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+            }
+
+            function nodeToXml(node, indent = '  ') {
+                let xml = '';
+                for (const child of node.childNodes) {
+                    if (child.nodeType === Node.TEXT_NODE) {
+                        const text = child.textContent.trim();
+                        if (text) xml += indent + escapeXml(text) + '\n';
+                    } else if (child.nodeType === Node.ELEMENT_NODE) {
+                        const tag = child.tagName.toLowerCase();
+                        const attrs = Array.from(child.attributes).map(a => ` ${a.name}="${escapeXml(a.value)}"`).join('');
+                        const inner = nodeToXml(child, indent + '  ');
+                        if (inner.trim()) {
+                            xml += `${indent}<${tag}${attrs}>\n${inner}${indent}</${tag}>\n`;
+                        } else {
+                            xml += `${indent}<${tag}${attrs}/>\n`;
+                        }
+                    }
+                }
+                return xml;
+            }
+
+            const bodyContent = nodeToXml(doc.body);
+            const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>\n<document>\n  <head>\n    <title>Converted HTML Document</title>\n    <charset>UTF-8</charset>\n  </head>\n  <body>\n${bodyContent}  </body>\n</document>`;
+            return new Blob([xmlContent], { type: 'application/xml; charset=utf-8' });
+        }
+
+        // ============ PPTX (настоящий формат PowerPoint) ============
+        async function generatePPTX(html) {
+            const pptx = new PptxGenJS();
+            pptx.layout = 'LAYOUT_WIDE';
+            pptx.author = 'HTML Converter Pro';
+            pptx.title = 'Converted HTML Document';
+
+            const blocks = parseHTMLToBlocks(html);
+            
+            // Группируем блоки в слайды (по заголовкам или по ~6 элементов)
+            const slides = [];
+            let currentSlide = [];
+            let titleFound = false;
+
+            for (const block of blocks) {
+                if (block.type === 'heading' && block.level <= 2) {
+                    if (currentSlide.length > 0) {
+                        slides.push(currentSlide);
+                        currentSlide = [];
+                    }
+                    currentSlide.push(block);
+                    titleFound = true;
+                } else {
+                    currentSlide.push(block);
+                    if (currentSlide.length >= 7) {
+                        slides.push(currentSlide);
+                        currentSlide = [];
+                    }
+                }
+            }
+            if (currentSlide.length > 0) slides.push(currentSlide);
+            if (slides.length === 0) slides.push([{ type: 'paragraph', text: 'Пустая презентация' }]);
+
+            slides.forEach((slideBlocks, idx) => {
+                const slide = pptx.addSlide();
+                slide.background = { color: 'FFFFFF' };
+
+                let yPos = 0.5;
+                const titleBlock = slideBlocks.find(b => b.type === 'heading' && b.level <= 2);
+
+                if (titleBlock) {
+                    slide.addText(titleBlock.text, {
+                        x: 0.5, y: 0.3, w: 12, h: 1,
+                        fontSize: titleBlock.level === 1 ? 36 : 28,
+                        bold: true,
+                        color: '2C3E50',
+                        fontFace: 'Arial'
+                    });
+                    yPos = 1.5;
+                } else if (idx === 0) {
+                    slide.addText('Презентация', {
+                        x: 0.5, y: 0.3, w: 12, h: 1,
+                        fontSize: 36, bold: true, color: '2C3E50', fontFace: 'Arial'
+                    });
+                    yPos = 1.5;
+                }
+
+                for (const block of slideBlocks) {
+                    if (block === titleBlock) continue;
+                    if (yPos > 6.5) break;
+
+                    if (block.type === 'heading') {
+                        slide.addText(block.text, {
+                            x: 0.5, y: yPos, w: 12, h: 0.6,
+                            fontSize: 22, bold: true, color: '34495E', fontFace: 'Arial'
+                        });
+                        yPos += 0.7;
+                    } else if (block.type === 'paragraph' || block.type === 'listitem') {
+                        const text = block.type === 'listitem' ? '• ' + block.text : block.text;
+                        slide.addText(text, {
+                            x: 0.5, y: yPos, w: 12, h: 0.5,
+                            fontSize: 16, color: '2C3E50', fontFace: 'Arial', valign: 'top'
+                        });
+                        yPos += 0.55;
+                    } else if (block.type === 'list') {
+                        const listText = block.items.map((item, i) => ({
+                            text: (block.ordered ? `${i + 1}. ` : '• ') + item + '\n',
+                            options: { fontSize: 16, color: '2C3E50', fontFace: 'Arial' }
+                        }));
+                        slide.addText(listText, {
+                            x: 0.7, y: yPos, w: 11.8, h: block.items.length * 0.4,
+                            valign: 'top'
+                        });
+                        yPos += block.items.length * 0.4 + 0.1;
+                    } else if (block.type === 'quote') {
+                        slide.addText(block.text, {
+                            x: 0.7, y: yPos, w: 11.6, h: 0.6,
+                            fontSize: 16, italics: true, color: '7F8C8D', fontFace: 'Arial',
+                            border: { type: 'solid', pt: 0, color: 'BDC3C7' },
+                            fill: { color: 'F8F9FA' }
+                        });
+                        yPos += 0.7;
+                    } else if (block.type === 'code') {
+                        slide.addText(block.text, {
+                            x: 0.5, y: yPos, w: 12, h: 0.8,
+                            fontSize: 12, fontFace: 'Courier New', color: '2C3E50',
+                            fill: { color: 'ECF0F1' }, valign: 'top'
+                        });
+                        yPos += 0.9;
+                    }
+                }
+
+                // Номер слайда
+                slide.addText(`${idx + 1} / ${slides.length}`, {
+                    x: 11.5, y: 7, w: 1.5, h: 0.3,
+                    fontSize: 10, color: '95A5A6', align: 'right'
+                });
+            });
+
+            const blob = await pptx.write({ outputType: 'blob' });
+            return blob;
+        }
+
+        function showSuccess(message) {
+            hideMessages();
+            successMessage.classList.remove('hidden');
+            successText.textContent = message;
+        }
+
+        function showError(message) {
+            hideMessages();
+            errorMessage.classList.remove('hidden');
+            errorText.textContent = message;
+        }
+
+        function hideMessages() {
+            successMessage.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+            progressSection.classList.add('hidden');
+        }
+
+        window.addEventListener('load', () => {
+            if (!htmlInput.value) {
+                htmlInput.value = ;
+            }
+        });
+    </script>
+</body>
+</html>
